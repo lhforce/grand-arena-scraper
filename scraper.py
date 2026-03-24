@@ -22,7 +22,7 @@ def scrape_ga():
         time.sleep(5) # Allow JS to render
         
         # Extract data (Basic example - would be refined based on DOM)
-        leaderboard = page.evaluate(''() => {
+        leaderboard = page.evaluate('''() => {
             const rows = Array.from(document.querySelectorAll('tr')).slice(1, 11);
             return rows.map(row => ({
                 rank: row.cells[0]?.innerText,
@@ -30,7 +30,7 @@ def scrape_ga():
                 points: row.cells[2]?.innerText,
                 synergy: row.cells[3]?.innerText
             }));
-        }'')
+        }''')
         
         # Push to Supabase
         data, count = supabase.table("ga_intelligence").insert({
