@@ -1,6 +1,7 @@
 import os
 import json
 import time
+import re
 from supabase import create_client, Client
 from playwright.sync_api import sync_playwright
 
@@ -16,25 +17,32 @@ def scrape_ga():
             user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36"
         ).new_page()
         
-        # Target: GATracker (Botto's data)
         print("Navigating to GATracker...")
         page.goto("https://gatracker.xyz/", wait_until="networkidle")
-        time.sleep(5) # Allow JS to render
+        time.sleep(10) # Heavy React render wait
         
-        # Extract data (Basic example - would be refined based on DOM)
-        leaderboard = page.evaluate('''() => {
-            const rows = Array.from(document.querySelectorAll('tr')).slice(1, 11);
-            return rows.map(row => ({
-                rank: row.cells[0]?.innerText,
-                player: row.cells[1]?.innerText,
-                points: row.cells[2]?.innerText,
-                synergy: row.cells[3]?.innerText
-            }));
-        }''')
+        leaderboard = page.evaluate(''' () => {
+            const data = [];
+            // New Selector Strategy: Find ID tags (#123) and traverse to siblings/parents
+            const idSpans = Array.from(document.querySelectorAll('span')).filter(s => /^#\\d+$/.test(s.innerText.trim()));
+            
+            idSpans.forEach(span => {
+                const row = span.closest('div[role="row"]') || span.closest('button') || span.parentElement.parentElement;
+                if (row) {
+                    const text = row.innerText.split('\\n');
+                    data.push({
+                        id: span.innerText,
+                        name: text[0] || 'Unknown',
+                        stats: text.join(' | ')
+                    });
+                }
+            });
+            return data.slice(0, 50);
+        } ''')
         
         # Push to Supabase
-        data, count = supabase.table("ga_intelligence").insert({
-            "contest_name": "Global Leaderboard",
+        supabase.table("ga_intelligence").insert({
+            "contest_name": "Global Leaderboard (Patch v2)",
             "leaderboard_data": leaderboard
         }).execute()
         
